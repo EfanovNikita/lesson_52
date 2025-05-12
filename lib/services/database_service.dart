@@ -62,6 +62,13 @@ class DatabaseService {
             cost REAL
           )
         ''');
+        await db.execute('''
+          CREATE TABLE auth (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            password TEXT NOT NULL UNQUE,
+            api_key TEXT NOT NULL
+          )
+        ''');
       },
     );
   }
@@ -177,6 +184,65 @@ class DatabaseService {
         'total_tokens': 0,
         'model_usage': {},
       };
+    }
+  }
+
+  // метод сохранения ключа в базу данных
+  Future<void> saveApiKey(String key, String password) async {
+    try {
+      final db = await database;
+
+      // Вставка данных в таблицу messages
+      await db.insert(
+        'auth',
+        {
+          'password': password,
+          'api_key': key,
+        },
+        conflictAlgorithm:
+            ConflictAlgorithm.replace, // Стратегия при конфликтах
+      );
+    } catch (e) {
+      debugPrint('Error saving api_key: $e'); // Логирование ошибок
+    }
+  }
+
+  // метод проверки ключа в базе данных
+  Future<bool> checkApiKey() async {
+    try {
+      final db = await database;
+      final map = await db.query('auth');
+      return map.isNotEmpty;
+    } catch (e) {
+      debugPrint('Error check api_key: $e'); // Логирование ошибок
+      rethrow;
+    }
+  }
+
+  // метод получения ключа из базы данных
+  Future<String> getkApiKey(String password) async {
+    try {
+      final db = await database;
+      final List<Map<String, dynamic>> map =
+          await db.query('auth', where: 'password = ?', whereArgs: [password]);
+      if (map.isNotEmpty) {
+        return map[0]['api_key'];
+      } else {
+        throw Exception('Неверный пароль');
+      }
+    } catch (e) {
+      debugPrint('Error get api_key: $e'); // Логирование ошибок
+      rethrow;
+    }
+  }
+
+  // метод удаления ключа из базы данных
+  Future<void> clearApiKey() async {
+    try {
+      final db = await database;
+      await db.delete('auth'); // Удаление всех записей из таблицы
+    } catch (e) {
+      debugPrint('Error clearing history: $e'); // Логирование ошибок
     }
   }
 }

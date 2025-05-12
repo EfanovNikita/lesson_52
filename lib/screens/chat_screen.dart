@@ -10,6 +10,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../providers/chat_provider.dart';
 // Импорт модели сообщения
 import '../models/message.dart';
+// Импорт для генерации пароля
+import 'dart:math';
 
 // Виджет для обработки ошибок в UI
 class ErrorBoundary extends StatelessWidget {
@@ -153,6 +155,253 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
+// виджет для ввода пароля
+class _PasswordInput extends StatefulWidget {
+  final Function(String) onSubmitted;
+  final void Function() onClearKey;
+
+  const _PasswordInput({required this.onSubmitted, required this.onClearKey});
+
+  @override
+  __PasswordInputState createState() => __PasswordInputState();
+}
+
+// состояние виджета для ввода пароля
+class __PasswordInputState extends State<_PasswordInput> {
+  // контролер текстового поля
+  final _controller = TextEditingController();
+  // флаг, указывающий заполнено ли текстовое поле
+  bool _isComposing = false;
+  // текст ошибки
+  String? _errorText;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  // метод отправки пароля
+  void _handleSubmitted(String password) async {
+    _controller.clear();
+    setState(() {
+      _isComposing = false;
+    });
+
+    try {
+      await widget.onSubmitted(password);
+    } catch (e) {
+      setState(() {
+        _errorText = e.toString();
+      });
+    }
+  }
+
+  // метод удаление существующего ключа
+  void _handleClearKey() {
+    widget.onClearKey();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            margin: EdgeInsets.only(bottom: 10),
+            padding: EdgeInsets.symmetric(vertical: 5),
+            child: TextField(
+              controller: _controller,
+              onChanged: (String text) {
+                setState(() {
+                  _isComposing = text.trim().isNotEmpty;
+                });
+              },
+              decoration: InputDecoration(
+                hintText: 'Введите пароль...',
+                hintStyle: const TextStyle(color: Colors.white54, fontSize: 13),
+                border: const OutlineInputBorder(),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12.0,
+                  vertical: 8.0,
+                ),
+                errorText: _errorText,
+              ),
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+            ),
+          ),
+          Row(
+            spacing: 16,
+            children: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color.fromARGB(255, 106, 181, 216)),
+                onPressed: _isComposing
+                    ? () => _handleSubmitted(_controller.text)
+                    : null,
+                child: const Text('Submit'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color.fromARGB(255, 106, 216, 115)),
+                onPressed: _handleClearKey,
+                child: const Text('New key'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// виджет для ввода ключа api
+class _AuthInput extends StatefulWidget {
+  final void Function(String, String) onSubmitted;
+
+  const _AuthInput({required this.onSubmitted});
+
+  @override
+  _AuthInputState createState() => _AuthInputState();
+}
+
+// состояние виджета для ввода ключа api
+class _AuthInputState extends State<_AuthInput> {
+  // Контроллер для управления текстовым полем
+  final _controller = TextEditingController();
+  // Флаг, указывающий, вводится ли сейчас сообщение
+  bool _isComposing = false;
+  // сгенерированный пароль
+  String _password = '';
+  // текст ошибки
+  String? _errorText;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  // сохранения ключа с паролем в базу данных
+  void _handleSubmitted(String key, String password) {
+    _controller.clear();
+    setState(() {
+      _isComposing = false;
+    });
+    widget.onSubmitted(key, password);
+  }
+
+  // генерация пароля
+  void _handleCreatePassword() {
+    var rng = Random();
+    String password = '';
+
+    for (var i = 0; i < 4; i++) {
+      password = '$password${rng.nextInt(10)}';
+    }
+
+    setState(() {
+      _password = password;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Builder(builder: (context) {
+      // поле для ввода ключа
+      if (_password.isEmpty) {
+        return Container(
+          padding: EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                margin: EdgeInsets.only(bottom: 10),
+                padding: EdgeInsets.symmetric(vertical: 5),
+                child: TextField(
+                  controller: _controller,
+                  onChanged: (String text) {
+                    // валидация ключа
+                    if (text.length > 9) {
+                      if (text.startsWith('sk-or-v1') |
+                          text.startsWith('sk-or-vv')) {
+                        setState(() {
+                          _isComposing = text.trim().isNotEmpty;
+                          _errorText = null;
+                        });
+                      } else {
+                        setState(() {
+                          _errorText = 'Неверный ключ';
+                        });
+                      }
+                    } else {
+                      setState(() {
+                        _isComposing = false;
+                        _errorText = null;
+                      });
+                    }
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Введите API-KEY...',
+                    hintStyle:
+                        const TextStyle(color: Colors.white54, fontSize: 13),
+                    border: const OutlineInputBorder(),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12.0,
+                      vertical: 8.0,
+                    ),
+                    errorText: _errorText,
+                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                ),
+              ),
+              Row(
+                children: [
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            const Color.fromARGB(255, 106, 181, 216)),
+                    onPressed:
+                        _isComposing ? () => _handleCreatePassword() : null,
+                    child: const Text('Submit'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+        // показываем пользователю сгенерированный пароль
+      } else {
+        return Container(
+          padding: EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+          child: Column(
+            children: [
+              Text('Ваш пароль: $_password'),
+              Row(
+                children: [
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            const Color.fromARGB(255, 106, 181, 216)),
+                    onPressed: _isComposing
+                        ? () => _handleSubmitted(_controller.text, _password)
+                        : null,
+                    child: const Text('Ok'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      }
+    });
+  }
+}
+
 // Виджет для ввода сообщений
 class _MessageInput extends StatefulWidget {
   final void Function(String) onSubmitted;
@@ -234,23 +483,38 @@ class ChatScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ErrorBoundary(
-      child: Scaffold(
-        backgroundColor: const Color(0xFF1E1E1E),
-        appBar: _buildAppBar(context),
-        body: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: _buildMessagesList(),
+    return Consumer<ChatProvider>(builder: (context, chatprovider, child) {
+      if (chatprovider.api == null) {
+        return ErrorBoundary(
+          child: Scaffold(
+            backgroundColor: const Color(0xFF1E1E1E),
+            body: SafeArea(
+              child: Expanded(
+                child: _buildInputAuth(context),
               ),
-              _buildInputArea(context),
-              _buildActionButtons(context),
-            ],
+            ),
           ),
-        ),
-      ),
-    );
+        );
+      } else {
+        return ErrorBoundary(
+          child: Scaffold(
+            backgroundColor: const Color(0xFF1E1E1E),
+            appBar: _buildAppBar(context),
+            body: SafeArea(
+              child: Column(
+                children: [
+                  Expanded(
+                    child: _buildMessagesList(),
+                  ),
+                  _buildInputArea(context),
+                  _buildActionButtons(context),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+    });
   }
 
   // Построение верхней панели приложения
@@ -473,6 +737,41 @@ class ChatScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // виджет аутентификации (ввод ключа или ввод пароля)
+  Widget _buildInputAuth(BuildContext context) {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(10.0),
+        padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 4.0),
+        color: const Color(0xFF262626),
+        width: 768,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            context.read<ChatProvider>().isApiKeyDB
+                ? Text('Введите пароль')
+                : Text('Введите api-key'),
+            context.read<ChatProvider>().isApiKeyDB
+                ? _PasswordInput(
+                    onSubmitted: (String password) async {
+                      await context.read<ChatProvider>().getApiKey(password);
+                    },
+                    onClearKey: () {
+                      context.read<ChatProvider>().clearApikey();
+                    },
+                  )
+                : _AuthInput(onSubmitted: (String key, String password) {
+                    if (key.trim().isNotEmpty & password.trim().isNotEmpty) {
+                      context.read<ChatProvider>().saveApiKey(key, password);
+                    }
+                  }),
+          ],
+        ),
       ),
     );
   }

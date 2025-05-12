@@ -31,5 +31,6 @@
         "bin": true,
         "build": true,
         "dist": true
-    }
+    },
+    "cmake.sourceDirectory": "${workspaceFolder}/windows"
 }

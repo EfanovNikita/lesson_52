@@ -18,7 +18,8 @@ import '../services/analytics_service.dart';
 // Основной класс провайдера для управления состоянием чата
 class ChatProvider with ChangeNotifier {
   // Клиент для работы с API
-  final OpenRouterClient _api = OpenRouterClient();
+  // final OpenRouterClient? _api = OpenRouterClient();
+  OpenRouterClient? _api;
   // Список сообщений чата
   final List<ChatMessage> _messages = [];
   // Логи для отладки
@@ -31,6 +32,8 @@ class ChatProvider with ChangeNotifier {
   String _balance = '\$0.00';
   // Флаг загрузки
   bool _isLoading = false;
+  // Флаг наличия в базе данных ключа
+  bool isApiKeyDB = false;
 
   // Метод для логирования сообщений
   void _log(String message) {
@@ -52,7 +55,7 @@ class ChatProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
 
   // Геттер для получения базового URL
-  String? get baseUrl => _api.baseUrl;
+  String? get baseUrl => _api?.baseUrl;
 
   // Конструктор провайдера
   ChatProvider() {
@@ -63,8 +66,16 @@ class ChatProvider with ChangeNotifier {
   // Метод инициализации провайдера
   Future<void> _initializeProvider() async {
     try {
+      // здесь проверяем _api, изначально None
       // Логирование начала инициализации
       _log('Initializing provider...');
+
+      // Проверяем наличие ключа в базе данных
+      await checkApiKey();
+      // проверяем наличие Openrouter клиента
+      if (_api == null) {
+        return;
+      }
       // Загрузка доступных моделей
       await _loadModels();
       _log('Models loaded: $_availableModels');
@@ -85,7 +96,7 @@ class ChatProvider with ChangeNotifier {
   Future<void> _loadModels() async {
     try {
       // Получение списка моделей из API
-      _availableModels = await _api.getModels();
+      _availableModels = await _api!.getModels();
       // Сортировка моделей по имени по возрастанию
       _availableModels
           .sort((a, b) => (a['name'] as String).compareTo(b['name'] as String));
@@ -105,7 +116,7 @@ class ChatProvider with ChangeNotifier {
   Future<void> _loadBalance() async {
     try {
       // Получение баланса из API
-      _balance = await _api.getBalance();
+      _balance = await _api!.getBalance();
       // Уведомление слушателей об изменениях
       notifyListeners();
     } catch (e) {
@@ -133,6 +144,54 @@ class ChatProvider with ChangeNotifier {
       // Логирование ошибок загрузки истории
       _log('Error loading history: $e');
     }
+  }
+
+  // метод сохранения ключа в базу данных
+  Future<void> saveApiKey(String key, String password) async {
+    try {
+      await _db.saveApiKey(key, password);
+      api = OpenRouterClient(key);
+      _initializeProvider();
+      notifyListeners();
+    } catch (e) {
+      _log('Error saving api: $e');
+    }
+  }
+
+  // метод проверки наличия в баззе данных api_key
+  Future<void> checkApiKey() async {
+    try {
+      isApiKeyDB = await _db.checkApiKey();
+      // return isExist;
+      notifyListeners();
+    } catch (e) {
+      _log('Error check api: $e');
+      // rethrow;
+    }
+  }
+
+  // метод получения api_key из базы данных
+  Future<void> getApiKey(String password) async {
+    try {
+      String key = await _db.getkApiKey(password);
+      api = OpenRouterClient(key);
+      _initializeProvider();
+      notifyListeners();
+    } catch (e) {
+      _log('Error get api-key: $e');
+      rethrow;
+    }
+  }
+
+  // метод удаления ключа из базы данных и удаление истории сообщений
+  Future<void> clearApikey() async {
+    // Удаление ключа из базы данных
+    await _db.clearApiKey();
+    isApiKeyDB = false;
+    api = null;
+
+    // удаление истории
+    await clearHistory();
   }
 
   // Метод сохранения сообщения в базу данных
@@ -177,7 +236,7 @@ class ChatProvider with ChangeNotifier {
       final startTime = DateTime.now();
 
       // Отправка сообщения в API
-      final response = await _api.sendMessage(content, _currentModel!);
+      final response = await _api!.sendMessage(content, _currentModel!);
       // Логирование ответа API
       _log('API Response: $response');
 
@@ -360,7 +419,7 @@ class ChatProvider with ChangeNotifier {
   }
 
   String formatPricing(double pricing) {
-    return _api.formatPricing(pricing);
+    return _api!.formatPricing(pricing);
   }
 
   // Метод экспорта истории
@@ -387,5 +446,13 @@ class ChatProvider with ChangeNotifier {
       'response_time_stats': responseTimeStats,
       'message_length_stats': messageLengthStats,
     };
+  }
+
+  OpenRouterClient? get api {
+    return _api;
+  }
+
+  set api(OpenRouterClient? apiClient) {
+    _api = apiClient;
   }
 }

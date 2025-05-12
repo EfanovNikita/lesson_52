@@ -10,62 +10,32 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 // Класс клиента для работы с API OpenRouter
 class OpenRouterClient {
   // API ключ для авторизации
-  final String? apiKey;
+  late String apiKey;
   // Базовый URL API
-  final String? baseUrl;
+  late String? baseUrl;
   // Заголовки HTTP запросов
-  final Map<String, String> headers;
+  late Map<String, String> headers;
 
   // Единственный экземпляр класса (Singleton)
   static final OpenRouterClient _instance = OpenRouterClient._internal();
 
-  // Фабричный метод для получения экземпляра
-  factory OpenRouterClient() {
-    return _instance;
-  }
-
   // Приватный конструктор для реализации Singleton
-  OpenRouterClient._internal()
-      : apiKey =
-            dotenv.env['OPENROUTER_API_KEY'], // Получение API ключа из .env
-        baseUrl = dotenv.env['BASE_URL'], // Получение базового URL из .env
-        headers = {
-          'Authorization':
-              'Bearer ${dotenv.env['OPENROUTER_API_KEY']}', // Заголовок авторизации
-          'Content-Type': 'application/json', // Указание типа контента
-          'X-Title': 'AI Chat Flutter', // Название приложения
-        } {
-    // Инициализация клиента
-    _initializeClient();
-  }
+  OpenRouterClient._internal();
 
-  // Метод инициализации клиента
-  void _initializeClient() {
-    try {
-      if (kDebugMode) {
-        print('Initializing OpenRouterClient...');
-        print('Base URL: $baseUrl');
-      }
-
-      // Проверка наличия API ключа
-      if (apiKey == null) {
-        throw Exception('OpenRouter API key not found in .env');
-      }
-      // Проверка наличия базового URL
-      if (baseUrl == null) {
-        throw Exception('BASE_URL not found in .env');
-      }
-
-      if (kDebugMode) {
-        print('OpenRouterClient initialized successfully');
-      }
-    } catch (e, stackTrace) {
-      if (kDebugMode) {
-        print('Error initializing OpenRouterClient: $e');
-        print('Stack trace: $stackTrace');
-      }
-      rethrow;
+  // Фабричный метод для получения экземпляра
+  factory OpenRouterClient(String key) {
+    _instance.apiKey = key;
+    if (key.contains('sk-or-v1')) {
+      _instance.baseUrl = dotenv.env['BASE_URL_OPENROUTER'];
+    } else if (key.contains('sk-or-vv')) {
+      _instance.baseUrl = dotenv.env['BASE_URL_VSEGPT'];
     }
+    _instance.headers = {
+      'Authorization': 'Bearer $key', // Заголовок авторизации
+      'Content-Type': 'application/json', // Указание типа контента
+      'X-Title': 'AI Chat Flutter', // Название приложения
+    };
+    return _instance;
   }
 
   // Метод получения списка доступных моделей
