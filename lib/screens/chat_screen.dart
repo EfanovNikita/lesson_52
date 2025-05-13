@@ -260,9 +260,10 @@ class __PasswordInputState extends State<_PasswordInput> {
 
 // виджет для ввода ключа api
 class _AuthInput extends StatefulWidget {
-  final void Function(String, String) onSubmitted;
+  final Function(String, String) onSubmitted;
+  final Function(String) onValidation;
 
-  const _AuthInput({required this.onSubmitted});
+  const _AuthInput({required this.onSubmitted, required this.onValidation});
 
   @override
   _AuthInputState createState() => _AuthInputState();
@@ -286,26 +287,43 @@ class _AuthInputState extends State<_AuthInput> {
   }
 
   // сохранения ключа с паролем в базу данных
-  void _handleSubmitted(String key, String password) {
+  void _handleSubmitted(String key, String password) async {
     _controller.clear();
     setState(() {
       _isComposing = false;
     });
-    widget.onSubmitted(key, password);
+    try {
+      await widget.onSubmitted(key, password);
+      setState(() {
+        _errorText = '';
+      });
+    } catch (e) {
+      setState(() {
+        _errorText = e.toString();
+      });
+    }
   }
 
   // генерация пароля
-  void _handleCreatePassword() {
-    var rng = Random();
-    String password = '';
+  void _handleCreatePassword(String key) async {
+    try {
+      await widget.onValidation(key);
 
-    for (var i = 0; i < 4; i++) {
-      password = '$password${rng.nextInt(10)}';
+      var rng = Random();
+      String password = '';
+
+      for (var i = 0; i < 4; i++) {
+        password = '$password${rng.nextInt(10)}';
+      }
+
+      setState(() {
+        _password = password;
+      });
+    } catch (e) {
+      setState(() {
+        _errorText = e.toString();
+      });
     }
-
-    setState(() {
-      _password = password;
-    });
   }
 
   @override
@@ -365,8 +383,9 @@ class _AuthInputState extends State<_AuthInput> {
                     style: ElevatedButton.styleFrom(
                         backgroundColor:
                             const Color.fromARGB(255, 106, 181, 216)),
-                    onPressed:
-                        _isComposing ? () => _handleCreatePassword() : null,
+                    onPressed: _isComposing
+                        ? () => _handleCreatePassword(_controller.text)
+                        : null,
                     child: const Text('Submit'),
                   ),
                 ],
@@ -387,9 +406,8 @@ class _AuthInputState extends State<_AuthInput> {
                     style: ElevatedButton.styleFrom(
                         backgroundColor:
                             const Color.fromARGB(255, 106, 181, 216)),
-                    onPressed: _isComposing
-                        ? () => _handleSubmitted(_controller.text, _password)
-                        : null,
+                    onPressed: () =>
+                        _handleSubmitted(_controller.text, _password),
                     child: const Text('Ok'),
                   ),
                 ],
@@ -765,11 +783,23 @@ class ChatScreen extends StatelessWidget {
                       context.read<ChatProvider>().clearApikey();
                     },
                   )
-                : _AuthInput(onSubmitted: (String key, String password) {
-                    if (key.trim().isNotEmpty & password.trim().isNotEmpty) {
-                      context.read<ChatProvider>().saveApiKey(key, password);
-                    }
-                  }),
+                : _AuthInput(
+                    onSubmitted: (String key, String password) async {
+                      if (key.trim().isNotEmpty & password.trim().isNotEmpty) {
+                        // await context.read<ChatProvider>().validationKey();
+                        try {
+                          await context
+                              .read<ChatProvider>()
+                              .saveApiKey(key, password);
+                        } catch (e) {
+                          rethrow;
+                        }
+                      }
+                    },
+                    onValidation: (String key) async {
+                      await context.read<ChatProvider>().validationKey(key);
+                    },
+                  ),
           ],
         ),
       ),

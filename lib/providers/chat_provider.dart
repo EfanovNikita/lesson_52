@@ -92,6 +92,16 @@ class ChatProvider with ChangeNotifier {
     }
   }
 
+  Future<void> validationKey(key) async {
+    try {
+      api ??= OpenRouterClient(key);
+      await _api!.validationKey();
+    } catch (e) {
+      api == null;
+      rethrow;
+    }
+  }
+
   // Метод загрузки доступных моделей
   Future<void> _loadModels() async {
     try {
@@ -149,12 +159,13 @@ class ChatProvider with ChangeNotifier {
   // метод сохранения ключа в базу данных
   Future<void> saveApiKey(String key, String password) async {
     try {
+      api ??= OpenRouterClient(key);
       await _db.saveApiKey(key, password);
-      api = OpenRouterClient(key);
       _initializeProvider();
       notifyListeners();
     } catch (e) {
       _log('Error saving api: $e');
+      rethrow;
     }
   }
 
@@ -162,11 +173,9 @@ class ChatProvider with ChangeNotifier {
   Future<void> checkApiKey() async {
     try {
       isApiKeyDB = await _db.checkApiKey();
-      // return isExist;
       notifyListeners();
     } catch (e) {
       _log('Error check api: $e');
-      // rethrow;
     }
   }
 
@@ -174,7 +183,7 @@ class ChatProvider with ChangeNotifier {
   Future<void> getApiKey(String password) async {
     try {
       String key = await _db.getkApiKey(password);
-      api = OpenRouterClient(key);
+      await validationKey(key);
       _initializeProvider();
       notifyListeners();
     } catch (e) {

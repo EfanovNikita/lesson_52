@@ -212,4 +212,22 @@ class OpenRouterClient {
       return '0.00';
     }
   }
+
+  Future<void> validationKey() async {
+    try {
+      http.Response response;
+      response = await http.get(
+        Uri.parse('$baseUrl/key'),
+        headers: headers,
+      );
+      if (response.statusCode == 401) {
+        final errorData = json.decode(utf8.decode(response.bodyBytes));
+        String errorMsg =
+            errorData['error']?['message'] ?? 'Unknown error occurred';
+        throw Exception(errorMsg);
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
 }
