@@ -97,7 +97,7 @@ class ChatProvider with ChangeNotifier {
       api ??= OpenRouterClient(key);
       await _api!.validationKey();
     } catch (e) {
-      api == null;
+      api = null;
       rethrow;
     }
   }
